@@ -1,24 +1,197 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-        
 
 model User {
+  id                  Int             @id @default(autoincrement())
+  username            String          @unique
+  email               String          @unique
+  passwordHash        String
+  token               String?
+  profileImage        String?
+  Score              Int             @default(0)
+  createdAt           DateTime        @default(now())
+  doubts              Doubt[]         @relation("UserDoubts")
+  solutions           Solution[]      @relation("UserSolutions")
+  projects            Project[]       @relation("UserProjects")
+  projectMemberships  ProjectMember[] @relation("ProjectMembers")
+  classRequests       ClassRequest[]  @relation("ClassRequester")
+  taughtClasses       Class[]         @relation("ClassTeacher")
+  attendedClasses     Class[]         @relation("ClassAttendee")
+  receivedPayments    Payment[]       @relation("TeacherPayments")
+  madePayments        Payment[]       @relation("StudentPayments")
+  postedPosts         Post[]          @relation("PostAuthor")
+  postedProjectsCount Int             @default(0)
+  joinedProjectsCount Int             @default(0)
+  requestedJoinCount JoinRequest[]   @relation("Requester")
+  verifiedJoinCount   JoinRequest[]   @relation("Verifier")
+}
+
+model Post {
+  id             Int            @id @default(autoincrement())
+  classId        Int
+  authorId       Int
+  author         User           @relation("PostAuthor", fields: [authorId], references: [id])
+  content        String
+  createdAt      DateTime       @default(now())
+  parentPostId   Int?         
+  parentPost     Post?          @relation("PostReplies", fields: [parentPostId], references: [id])
+
+  replies        Post[]         @relation("PostReplies")
+}
+
+model Doubt {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String
+  image       String?
+  video       String?
+  link        String?
+  createdAt   DateTime   @default(now())
+  userId      Int
+  user        User       @relation("UserDoubts", fields: [userId], references: [id])
+  solutions   Solution[]
+  tags        DoubtTag[]
+}
+
+model Solution {
+  id               Int        @id @default(autoincrement())
+  content          String
+  createdAt        DateTime   @default(now())
+  doubtId          Int
+  doubt            Doubt      @relation(fields: [doubtId], references: [id])
+  userId           Int
+  user             User       @relation("UserSolutions", fields: [userId], references: [id])
+  parentSolutionId Int?
+  parentSolution   Solution?  @relation("SolutionReplies", fields: [parentSolutionId], references: [id])
+  replies          Solution[] @relation("SolutionReplies")
+}
+
+model Project {
+  id          Int             @id @default(autoincrement())
+  title       String
+  description String
+  createdAt   DateTime        @default(now())
+  ownerId     Int
+  owner       User            @relation("UserProjects", fields: [ownerId], references: [id])
+  members     ProjectMember[]
+  tags        ProjectTag[]
+  isFull      Boolean         @default(false)
+  joinRequests JoinRequest[]
+
+
+}
+
+model ProjectMember {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  password  String
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User     @relation("ProjectMembers", fields: [userId], references: [id])
+  joinedAt  DateTime @default(now())
+  isOwner   Boolean  @default(false)
+
+   @@unique([projectId, userId])
+}
+
+model JoinRequest {
+  id               Int                @id @default(autoincrement())
+  project          Project            @relation(fields: [projectId], references: [id])
+  projectId        Int
+  requester        User               @relation("Requester", fields: [requesterId], references: [id])
+  requesterId      Int
+  ownerId           Int
+  owner         User               @relation("Verifier", fields: [ownerId], references: [id])
+  verifierId       Int?
+  status           RequestStatus      @default(PENDING)
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Class {
+  id           Int            @id @default(autoincrement())
+  teacherId    Int
+  teacher      User           @relation("ClassTeacher", fields: [teacherId], references: [id])
+  attendeeId   Int
+  attendee     User           @relation("ClassAttendee", fields: [attendeeId], references: [id])
+  scheduledAt  DateTime
+  ClassRequest ClassRequest[]
+  Payment      Payment[]
+
+  @@index([teacherId])
+  @@index([attendeeId])
+}
+
+model ClassRequest {
+  id          Int         @id @default(autoincrement())
+  requesterId Int
+  requester   User        @relation("ClassRequester", fields: [requesterId], references: [id])
+  title       String
+  description String
+  requestedAt DateTime    @default(now())
+  scheduledAt DateTime
+  status      ClassStatus @default(PENDING)
+  classId     Int?
+  class       Class?      @relation(fields: [classId], references: [id])
+
+  @@index([requesterId])
+}
+
+enum ClassStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  class     Class    @relation(fields: [classId], references: [id])
+  amount    Float
+  paidAt    DateTime @default(now())
+  studentId Int
+  student   User     @relation("StudentPayments", fields: [studentId], references: [id])
+  teacherId Int
+  teacher   User     @relation("TeacherPayments", fields: [teacherId], references: [id])
+
+  @@index([classId])
+  @@index([studentId])
+  @@index([teacherId])
+}
+
+model Tag {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  doubtTags   DoubtTag[]
+  projectTags ProjectTag[]
+}
+
+model DoubtTag {
+  id      Int   @id @default(autoincrement())
+  doubtId Int
+  tagId   Int
+  doubt   Doubt @relation(fields: [doubtId], references: [id])
+  tag     Tag   @relation(fields: [tagId], references: [id])
+
+   @@unique([doubtId, tagId])
+}
+
+model ProjectTag {
+  id        Int     @id @default(autoincrement())
+  projectId Int
+  tagId     Int
+  project   Project @relation(fields: [projectId], references: [id])
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+   @@unique([projectId, tagId])
 }
