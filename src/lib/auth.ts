@@ -5,28 +5,18 @@ import bcrypt from "bcrypt";
 import { JWTPayload, SignJWT, importJWK } from "jose";
 import { NextAuthOptions } from "next-auth";
 import prisma from "./prisma";
+import { signUpSchema } from "@/schema/signupSchema";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  token?: string;
-}
-
-interface token extends JWT {
-  uid: string;
-  jwtToken: string;
-}
-
-const generateJWT = async (payload:JWTPayload): Promise<any> => {
+const generateJWT = async (payload: JWTPayload): Promise<string> => {
   const secret = process.env.JWT_SECRET || "";
 
   const jwk = await importJWK({ k: secret, alg: "HS256", kty: "oct" });
 
-  const jwt=await new SignJWT(payload).setProtectedHeader({alg: "HS256"})
-  .setIssuedAt()
-  .setExpirationTime("365d")
-  .sign(jwk);
+  const jwt = await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("365d")
+    .sign(jwk);
 
   return jwt;
 };
@@ -49,6 +39,13 @@ export const NEXT_AUTH: NextAuthOptions = {
         const email = credentials.email;
         const password = credentials.password;
 
+        try{
+          signUpSchema.parse({username,email,password})
+        }
+        catch(e:any){
+          throw new Error(e.errors[0].message)
+        }
+
         try {
           const userDb = await prisma.user.findFirst({
             where: {
@@ -61,19 +58,14 @@ export const NEXT_AUTH: NextAuthOptions = {
               passwordHash: true,
             },
           });
-          console.log("User found in db ", userDb);
-
-          const hashedPassword = await bcrypt.hash(password, 10);
+          console.log("userDb", userDb);
 
           if (
             userDb &&
             password &&
             (await bcrypt.compare(credentials.password, userDb.passwordHash))
           ) {
-            console.log("User found in db ");
-            const jwt= await generateJWT({
-              id: userDb.id,
-            });
+            const jwt = await generateJWT({ id: userDb.id });
 
             await prisma.user.update({
               where: {
@@ -83,6 +75,7 @@ export const NEXT_AUTH: NextAuthOptions = {
                 token: jwt,
               },
             });
+
             return {
               id: userDb.id,
               username: userDb.username,
@@ -90,7 +83,8 @@ export const NEXT_AUTH: NextAuthOptions = {
               token: jwt,
             };
           }
-          console.log("User not found in db ");
+
+          const hashedPassword = await bcrypt.hash(password, 10);
 
           const user = await prisma.user.create({
             data: {
@@ -104,11 +98,10 @@ export const NEXT_AUTH: NextAuthOptions = {
               email: true,
             },
           });
+
           if (!user) return null;
 
-          const jwt  = await generateJWT({
-            id: user.id,
-          });
+          const jwt = await generateJWT({ id: user.id });
 
           await prisma.user.update({
             where: {
@@ -118,7 +111,6 @@ export const NEXT_AUTH: NextAuthOptions = {
               token: jwt,
             },
           });
-          console.log("User created in db ");
 
           return {
             id: user.id,
@@ -127,8 +119,8 @@ export const NEXT_AUTH: NextAuthOptions = {
             token: jwt,
           };
         } catch (e) {
-          console.log(e);
-          return `Db error ${e}`;
+          console.error("Database error:", e);
+          return null;
         }
       },
     }),
@@ -137,20 +129,62 @@ export const NEXT_AUTH: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET || "secr3t",
-  callbacks:{
-    async session({session, token}:any){
-      session.jwt=token.jwt;
-      session.id=token.id;
-      console.log("session",session);
+  secret: process.env.NEXTAUTH_SECRET || "",
+  callbacks: {
+    async session({ session, token }: any) {
+      if (token) console.log("token", token);
+      session.user.id = token.id;
+      session.user.username = token.username;
+      session.user.email = token.email;
       return session;
     },
-    async jwt({token,user}){
-      if(user){
-        token.id=user.id;
-        
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.username = user.username;
+        token.email = user.email;
+        console.log("token", token);
       }
       return token;
-    }
-  }
+    },
+    async signIn({ user, account, profile, email, credentials }) {
+     if(account?.provider=="google"){
+      console.log(user)
+      try{
+        const userDb = await prisma.user.upsert({
+          where: {
+            email: user.email,
+          },
+          update: {
+            //@ts-ignore
+            username: user.name,
+            email: user.email,
+            profileImage: user.image,
+            passwordHash:""
+          },
+          create: {
+            email: user.email,
+            //@ts-ignore
+            username: user.name,
+            profileImage: user.image,
+            passwordHash:''
+          },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        });
+        console.log(userDb)
+         return true
+      }
+      catch(e){
+          console.error("Database error:", e);
+          return false;
+      }
+      
+     }
+      return false;
+    },
+  },
 };
