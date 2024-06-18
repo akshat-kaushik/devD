@@ -1,12 +1,13 @@
-import prisma from "@/lib/prisma";
+"use client"
 import { Button } from "@/components/ui/button";
-
 
 
 export default function Home() {
   return (
    <>heelo
-   <Button>fnwa</Button>
+   <Button onClick={()=>{
+    
+   }}>fnwa</Button>
    </>
   );
 }

@@ -5,4 +5,6 @@ const handler = NextAuth({
   ...NEXT_AUTH,
 });
 
+
+
 export { handler as GET, handler as POST };

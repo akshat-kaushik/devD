@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  postgresql:
+    image: postgres:latest
+    container_name: devddb1
+    ports:
+      - "5432:5432"
+    volumes:
+      - data:/var/lib/postgresql/data
+    env_file:
+      - .env
+
+  devdnext:
+    build:
+      context: .
+    container_name: devdnext_app
+    depends_on:
+      - postgresql
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
+
+volumes:
+  data:
