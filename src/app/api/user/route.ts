@@ -1,8 +1,8 @@
-import { getSession } from "next-auth/react";
+import { getServerSession } from "next-auth";
 import { NextResponse,NextRequest } from "next/server";
 
-export function GET(){
-    const session=getSession();
+export  async function GET(){
+    const session=await getServerSession();
     console.log(session);
     return NextResponse.json({
         success:true,

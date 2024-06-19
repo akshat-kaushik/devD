@@ -5,13 +5,12 @@ import bcrypt from "bcrypt";
 import { JWTPayload, SignJWT, importJWK } from "jose";
 import { NextAuthOptions } from "next-auth";
 import prisma from "./prisma";
-import { signUpSchema } from "@/schema/signupSchema";
 
 const generateJWT = async (payload: JWTPayload): Promise<string> => {
   const secret = process.env.JWT_SECRET || "";
+  if (!secret) throw new Error("JWT_SECRET is not defined");
 
   const jwk = await importJWK({ k: secret, alg: "HS256", kty: "oct" });
-
   const jwt = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -35,21 +34,16 @@ export const NEXT_AUTH: NextAuthOptions = {
         },
       },
       async authorize(credentials: any): Promise<any> {
-        const username = credentials.username;
-        const email = credentials.email;
-        const password = credentials.password;
-
-        try{
-          signUpSchema.parse({username,email,password})
-        }
-        catch(e:any){
-          throw new Error(e.errors[0].message)
+        const { username, email, password } = credentials;
+        if (!username || !email || !password) {
+          console.error("Missing credentials");
+          return null;
         }
 
         try {
           const userDb = await prisma.user.findFirst({
             where: {
-              OR: [{ username: username }, { email: email }],
+              OR: [{ username }, { email }],
             },
             select: {
               id: true,
@@ -58,66 +52,33 @@ export const NEXT_AUTH: NextAuthOptions = {
               passwordHash: true,
             },
           });
-          console.log("userDb", userDb);
 
-          if (
-            userDb &&
-            password &&
-            (await bcrypt.compare(credentials.password, userDb.passwordHash))
-          ) {
+          if (userDb && await bcrypt.compare(password, userDb.passwordHash)) {
             const jwt = await generateJWT({ id: userDb.id });
-
             await prisma.user.update({
-              where: {
-                id: userDb.id,
-              },
-              data: {
-                token: jwt,
-              },
+              where: { id: userDb.id },
+              data: { token: jwt },
             });
 
-            return {
-              id: userDb.id,
-              username: userDb.username,
-              email: userDb.email,
-              token: jwt,
-            };
+            return { id: userDb.id, username: userDb.username, email: userDb.email, token: jwt };
           }
 
           const hashedPassword = await bcrypt.hash(password, 10);
-
           const user = await prisma.user.create({
-            data: {
-              username: username,
-              email: email,
-              passwordHash: hashedPassword,
-            },
-            select: {
-              id: true,
-              username: true,
-              email: true,
-            },
+            data: { username, email, passwordHash: hashedPassword },
+            select: { id: true, username: true, email: true },
           });
 
-          if (!user) return null;
+          if (user) {
+            const jwt = await generateJWT({ id: user.id });
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { token: jwt },
+            });
 
-          const jwt = await generateJWT({ id: user.id });
-
-          await prisma.user.update({
-            where: {
-              id: user.id,
-            },
-            data: {
-              token: jwt,
-            },
-          });
-
-          return {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            token: jwt,
-          };
+            return { id: user.id, username: user.username, email: user.email, token: jwt };
+          }
+          return null;
         } catch (e) {
           console.error("Database error:", e);
           return null;
@@ -132,10 +93,11 @@ export const NEXT_AUTH: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "",
   callbacks: {
     async session({ session, token }: any) {
-      if (token) console.log("token", token);
-      session.user.id = token.id;
-      session.user.username = token.username;
-      session.user.email = token.email;
+      if (token) {
+        session.user.id = token.id;
+        session.user.username = token.username;
+        session.user.email = token.email;
+      }
       return session;
     },
     async jwt({ token, user }) {
@@ -143,47 +105,34 @@ export const NEXT_AUTH: NextAuthOptions = {
         token.id = user.id;
         token.username = user.username;
         token.email = user.email;
-        console.log("token", token);
       }
       return token;
     },
     async signIn({ user, account, profile, email, credentials }) {
-     if(account?.provider=="google"){
-      console.log(user)
-      try{
-        const userDb = await prisma.user.upsert({
-          where: {
-            email: user.email,
-          },
-          update: {
-            //@ts-ignore
-            username: user.name,
-            email: user.email,
-            profileImage: user.image,
-            passwordHash:""
-          },
-          create: {
-            email: user.email,
-            //@ts-ignore
-            username: user.name,
-            profileImage: user.image,
-            passwordHash:''
-          },
-          select: {
-            id: true,
-            username: true,
-            email: true,
-          },
-        });
-        console.log(userDb)
-         return true
-      }
-      catch(e){
+      if (account?.provider === "google") {
+        try {
+          const userDb = await prisma.user.upsert({
+            where: { email: user.email },
+            update: {
+              username: user.name,
+              email: user.email,
+              profileImage: user.image,
+              passwordHash: ""
+            },
+            create: {
+              email: user.email,
+              username: user.name,
+              profileImage: user.image,
+              passwordHash: ""
+            },
+            select: { id: true, username: true, email: true },
+          });
+          return true;
+        } catch (e) {
           console.error("Database error:", e);
           return false;
+        }
       }
-      
-     }
       return false;
     },
   },
