@@ -7,6 +7,9 @@ import ErrorHandler from "./utils/error";
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req });
   const url = req.nextUrl;
+  console.log("middleware hit");
+  console.log(url.pathname);
+  console.log(token);
 
   if (
     token &&
@@ -21,33 +24,34 @@ export const config = {
     "/api/auth/[...nextauth]",
     "/api/auth/signin",
     "/api/auth/signout",
-    "/"
+    "/api/user",
+
   ],
 };
 
-export const TryCatch = (func: ControllerType) => async (
-  req: NextRequest,
-  res: NextResponse,
-  next: NextMiddleware
-) => {
-  try {
-    return await func(req, res, next);
-  } catch (error) {
-    console.error(error);
-    return next;
-  }
-};
+// export const TryCatch = (func: ControllerType) => async (
+//   req: NextRequest,
+//   res: NextResponse,
+//   next: NextMiddleware
+// ) => {
+//   try {
+//     return await func(req, res, next);
+//   } catch (error) {
+//     console.error(error);
+//     return next;
+//   }
+// };
 
 
-export const errorMiddleware = (err: ErrorHandler, res: NextResponse) => {
-  err.message ||= "Internal Server Error";
-  err.statusCode ||= 500;
+// export const errorMiddleware = (err: ErrorHandler, res: NextResponse) => {
+//   err.message ||= "Internal Server Error";
+//   err.statusCode ||= 500;
 
-  if (err.name === "CastError") err.message = "Invalid ID";
+//   if (err.name === "CastError") err.message = "Invalid ID";
 
-  const errorResponse = {
-    success: false,
-    message: err.message,
-  };
-  return NextResponse.json(errorResponse, { status: err.statusCode });
-};
+//   const errorResponse = {
+//     success: false,
+//     message: err.message,
+//   };
+//   return NextResponse.json(errorResponse, { status: err.statusCode });
+// };

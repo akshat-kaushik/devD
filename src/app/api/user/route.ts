@@ -1,11 +1,21 @@
-import { getServerSession } from "next-auth";
-import { NextResponse,NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { getServerSession } from "next-auth"
+import prisma from "@/lib/prisma";
 
-export  async function GET(){
-    const session=await getServerSession();
-    console.log(session);
+export async function GET(req: NextRequest) {
+  const token = await getToken({ req });
+    const post=await prisma.post.findMany({
+        where:{
+        }
+    })
+  if (token) {
     return NextResponse.json({
-        success:true,
-        data:"hello world"
+      name: token.username,
     });
+  } else {
+    return NextResponse.json({
+      name: null,
+    });
+  }
 }
