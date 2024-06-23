@@ -1,6 +1,5 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
-import { JWT } from "next-auth/jwt";
 import bcrypt from "bcrypt";
 import { JWTPayload, SignJWT, importJWK } from "jose";
 import { NextAuthOptions } from "next-auth";
@@ -39,11 +38,11 @@ export const NEXT_AUTH: NextAuthOptions = {
         const email = credentials.email;
         const password = credentials.password;
 
-        try {
-          signUpSchema.parse({ username, email, password });
-        } catch (e: any) {
-          throw new Error(e.errors[0].message);
-        }
+        // try {
+        //   signUpSchema.parse({ username, email, password });
+        // } catch (e: any) {
+        //   throw new Error(e.errors[0].message);
+        // }
 
         try {
           const userDb = await prisma.user.findFirst({
@@ -175,7 +174,7 @@ export const NEXT_AUTH: NextAuthOptions = {
               email: true,
             },
           });
-          console.log(userDb);
+          console.log(userDb,"from ggoollgle");
           return true;
         } catch (e) {
           console.error("Database error:", e);

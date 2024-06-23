@@ -5,13 +5,21 @@ import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const token = await getToken({ req });
-    const post=await prisma.post.findMany({
-        where:{
-        }
-    })
+  console.log(token,"from user api");
+    // const user=await prisma.user.findUnique({
+    //     where:{
+    //       username:token?.username as string
+    //     },
+    //     select:{
+    //       username:true,
+    //       email:true,
+    //       profileImage:true
+    //     }
+    // })
   if (token) {
     return NextResponse.json({
       name: token.username,
+      google_name: token.name,
     });
   } else {
     return NextResponse.json({

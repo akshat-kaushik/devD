@@ -41,7 +41,6 @@ model Post {
   createdAt      DateTime       @default(now())
   parentPostId   Int?         
   parentPost     Post?          @relation("PostReplies", fields: [parentPostId], references: [id])
-
   replies        Post[]         @relation("PostReplies")
 }
 
@@ -83,8 +82,6 @@ model Project {
   tags        ProjectTag[]
   isFull      Boolean         @default(false)
   joinRequests JoinRequest[]
-
-
 }
 
 model ProjectMember {
@@ -177,21 +174,19 @@ model Tag {
 }
 
 model DoubtTag {
-  id      Int   @id @default(autoincrement())
   doubtId Int
   tagId   Int
   doubt   Doubt @relation(fields: [doubtId], references: [id])
   tag     Tag   @relation(fields: [tagId], references: [id])
 
-   @@unique([doubtId, tagId])
+   @@id([doubtId, tagId])
 }
 
 model ProjectTag {
-  id        Int     @id @default(autoincrement())
   projectId Int
   tagId     Int
   project   Project @relation(fields: [projectId], references: [id])
   tag       Tag     @relation(fields: [tagId], references: [id])
 
-   @@unique([projectId, tagId])
+   @@id([projectId, tagId])
 }

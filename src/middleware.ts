@@ -3,20 +3,30 @@ import type { NextMiddleware, NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { ControllerType } from "./types/types";
 import ErrorHandler from "./utils/error";
+import { STATUS_CODES } from "http";
 
-export async function middleware(req: NextRequest) {
+interface CustomNextRequest extends NextRequest {
+  userId?: number;
+}
+
+export async function middleware(req: CustomNextRequest) {
   const token = await getToken({ req });
   const url = req.nextUrl;
   console.log("middleware hit");
   console.log(url.pathname);
   console.log(token);
 
+  if (url.pathname.startsWith("/api")) {
+    if (!token) throw new ErrorHandler("Unauthorized", 401);
+    req.userId = token?.id;
+  }
+
   if (
     token &&
-    (url.pathname.startsWith("/sign-in") ||
-      url.pathname.startsWith("/sign-up")) 
-  )
+    (url.pathname.startsWith("/sign-in") || url.pathname.startsWith("/sign-up"))
+  ) {
     return NextResponse.redirect("/");
+  }
 }
 
 export const config = {
@@ -25,33 +35,30 @@ export const config = {
     "/api/auth/signin",
     "/api/auth/signout",
     "/api/user",
-
   ],
 };
 
-// export const TryCatch = (func: ControllerType) => async (
-//   req: NextRequest,
-//   res: NextResponse,
-//   next: NextMiddleware
-// ) => {
-//   try {
-//     return await func(req, res, next);
-//   } catch (error) {
-//     console.error(error);
-//     return next;
-//   }
-// };
+export const TryCatch =
+  (func: ControllerType) =>
+  async (
+    req: NextRequest,
+    res: NextResponse,
+    next: NextMiddleware
+  ): Promise<void> => {
+    try {
+      await Promise.resolve(func(req, res, next));
+    } catch (error) {
+      next(error, req);
+    }
+  };
 
+export const errorMiddleware = (err: ErrorHandler) => {
+  err.message = err.message || "Internal Server Error";
+  err.statusCode = err.statusCode || 500; 
 
-// export const errorMiddleware = (err: ErrorHandler, res: NextResponse) => {
-//   err.message ||= "Internal Server Error";
-//   err.statusCode ||= 500;
-
-//   if (err.name === "CastError") err.message = "Invalid ID";
-
-//   const errorResponse = {
-//     success: false,
-//     message: err.message,
-//   };
-//   return NextResponse.json(errorResponse, { status: err.statusCode });
-// };
+  const errorResponse = {
+    success: false,
+    message: err.message,
+  };
+  return NextResponse.json(errorResponse, { status: err.statusCode });
+};

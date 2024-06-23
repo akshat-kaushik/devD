@@ -1,4 +1,4 @@
-import { NextResponse,NextMiddleware,NextRequest } from "next/server"
+import { NextResponse, NextMiddleware, NextRequest } from "next/server";
 
 export type ControllerType = {
   (
@@ -8,5 +8,12 @@ export type ControllerType = {
   ): Promise<void | Response>;
 };
 
-
-
+export type DoubtType = {
+  id?: number;
+  title: string;
+  description: string;
+  image?: string;
+  video?: string;
+  link?: string;
+  tags: Array<string>;
+};

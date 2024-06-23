@@ -15,3 +15,8 @@ declare module "next-auth/session" {
         };
     }
 }
+declare module "next-auth/jwt" {
+    interface JWT {
+        id: number;
+    }
+}
